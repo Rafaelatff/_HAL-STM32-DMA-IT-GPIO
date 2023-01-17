@@ -66,3 +66,87 @@ Bassicaly (from _HAL driver):
       }
 ```
 
+We can have the calling for the callback function before while loop. It is done using the 'HAL_DMA_RegisterCallback'. Those parameters are:
+
+* DMA_HandleTypeDef \*hdma: &hdma_memtomem_dma2_stream0 (the address for the variable for DMA stream 0);
+* HAL_DMA_CallbackIDTypeDef CallbackID: HAL_DMA_XFER_CPLT_CB_ID (the enum for the callback ID (see options next));
+* void (\* pCallback)(DMA_HandleTypeDef \*_hdma): &MY_DMA_TC_CB (the address for the function we are going to create (at the bottom of main.c file)).
+
+MY_DMA_TC_CB is short for 'my dma transfer complete callback'. The options for HAL_DMA_CallbackIDTypeDef CallbackID (from stm32fxx_hal_dma.h file):
+
+```c
+/** 
+  * @brief  HAL DMA Error Code structure definition
+  */
+typedef enum
+{
+  HAL_DMA_XFER_CPLT_CB_ID         = 0x00U,  /*!< Full transfer     */
+  HAL_DMA_XFER_HALFCPLT_CB_ID     = 0x01U,  /*!< Half Transfer     */
+  HAL_DMA_XFER_M1CPLT_CB_ID       = 0x02U,  /*!< M1 Full Transfer  */
+  HAL_DMA_XFER_M1HALFCPLT_CB_ID   = 0x03U,  /*!< M1 Half Transfer  */
+  HAL_DMA_XFER_ERROR_CB_ID        = 0x04U,  /*!< Error             */
+  HAL_DMA_XFER_ABORT_CB_ID        = 0x05U,  /*!< Abort             */
+  HAL_DMA_XFER_ALL_CB_ID          = 0x06U   /*!< All               */
+}HAL_DMA_CallbackIDTypeDef;
+```
+
+I added the private function prototype at the top of the code:
+
+![image](https://user-images.githubusercontent.com/58916022/213006031-0a71090b-b3eb-4977-bb27-8abf43c79b7d.png)
+
+And at the bottom:
+
+```c
+/* USER CODE BEGIN 4 */
+void MY_DMA_TC_CB(DMA_HandleTypeDef *pHandle){
+	// do not implement while loops here
+}
+/* USER CODE END 4 */
+```
+
+And in the while loop, the only difference is that we don't hold the processor during the return of complete data transfered (or max delay time). We don't have the 'HAL_DMA_PollForTransfer' function.
+
+Final code (comments reduced):
+
+```c
+int main(void)
+{
+  /* MCU Configuration--------------------------------------------------------*/
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_DMA_Init();
+  MX_USART2_UART_Init();
+  /* USER CODE BEGIN 2 */
+  HAL_DMA_RegisterCallback(&hdma_memtomem_dma2_stream0, HAL_DMA_XFER_CPLT_CB_ID, &MY_DMA_TC_CB);
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+   while (1)
+  {
+     /* USER CODE BEGIN 3 */
+	  HAL_DMA_Start_IT(&hdma_memtomem_dma2_stream0, (uint32_t) &led_data[0], (uint32_t) &GPIOA->ODR, 1);
+	  // after complete this, we will have an interrupt and no need for the HAL_DMA_PollForTransfer to finish
+
+	  /*delay of 400 msec*/
+	  current_ticks = HAL_GetTick();
+	  while ((current_ticks +400) >= HAL_GetTick());
+
+	  HAL_DMA_Start_IT(&hdma_memtomem_dma2_stream0, (uint32_t) &led_data[1], (uint32_t) &GPIOA->ODR, 1);
+	  // after complete this, we will have an interrupt and no need for the HAL_DMA_PollForTransfer to finish
+
+	  /*delay of 400 msec*/
+	  current_ticks = HAL_GetTick();
+	  while ((current_ticks +400) >= HAL_GetTick());
+  }
+  /* USER CODE END 3 */
+}
+```
+
+
+
